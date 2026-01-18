@@ -37,8 +37,19 @@ class MAVLinkNode(Node):
 
         # heartbeat timer
         self.create_timer(1.0, self.publish_state)
+        self.create_timer(1.0, self.check_vehicle_state)
+
 
     # -------------------------------------------------------
+
+    def check_vehicle_state(self):
+        msg = self.master.recv_match(type='HEARTBEAT', blocking=False)
+
+        if msg:
+            self.armed = bool(msg.base_mode & mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED)
+            self.mode = msg.custom_mode
+
+
 
     def publish_state(self):
         msg = String()
@@ -48,17 +59,25 @@ class MAVLinkNode(Node):
     # -------------------------------------------------------
 
     def set_guided_and_arm(self):
-        """
-        Ensure drone is in GUIDED mode and armed
-        """
 
-        # Set GUIDED mode
-        self.master.set_mode('GUIDED')
-        time.sleep(1)
+        self.check_vehicle_state()
 
-        # Arm
-        self.master.arducopter_arm()
-        time.sleep(2)
+    # Only change if needed
+        if not self.armed:
+            self.master.mav.command_long_send(
+                self.master.target_system,
+                self.master.target_component,
+                mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM,
+                0, 1, 0, 0, 0, 0, 0, 0
+            )
+            self.get_logger().info("Arming sent")
+
+    # GUIDED = 4 for copter
+        self.master.mav.set_mode_send(
+            self.master.target_system,
+            mavutil.mavlink.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED,
+            4
+        )
 
     # -------------------------------------------------------
 
