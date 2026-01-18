@@ -25,7 +25,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'camera = autonomy_ros.camera_node:main',
+            'mavlink = autonomy_ros.mavlink_node:main',
         ],
     },
 
