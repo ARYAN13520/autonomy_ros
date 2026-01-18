@@ -1,0 +1,21 @@
+# ROS
+build/
+install/
+log/
+
+# Python
+__pycache__/
+*.pyc
+
+# IDE
+.vscode/
+.idea/
+
+# SITL logs
+*.tlog
+*.bin
+terrain/
+
+# MAVLink
+mav.parm
+
