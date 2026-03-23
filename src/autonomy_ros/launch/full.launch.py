@@ -7,9 +7,18 @@ def generate_launch_description():
         Node(
             package='autonomy_ros',
             executable='mavlink',
-            name='mavlink_node',
-            output='screen'
+            name='mavlink_node'
+        ),
+
+        Node(
+            package='autonomy_ros',
+            executable='controller',
+            name='controller_node'
+        ),
+        Node(
+            package='autonomy_ros',
+            executable='flight',
+            name='flight_service'
         ),
 
     ])
-

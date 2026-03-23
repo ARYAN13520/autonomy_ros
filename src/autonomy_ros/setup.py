@@ -26,6 +26,8 @@ setup(
     entry_points={
         'console_scripts': [
             'mavlink = autonomy_ros.mavlink_node:main',
+            'controller = autonomy_ros.controller_node:main',
+            'flight = autonomy_ros.flight_service:main',
         ],
     },
 
