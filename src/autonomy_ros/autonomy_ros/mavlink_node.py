@@ -23,6 +23,7 @@ class MAVLinkNode(Node):
 
         self.armed = False
         self.mode = 0
+        self.airborne = False   # 🔥 IMPORTANT
 
         # ROS interfaces
         self.sub = self.create_subscription(
@@ -63,12 +64,10 @@ class MAVLinkNode(Node):
 
     def set_guided_and_arm(self):
 
-        # Read latest state
         for _ in range(5):
             self.check_vehicle_state()
             time.sleep(0.1)
 
-        # ----- ARM IF NOT -----
         if not self.armed:
             self.get_logger().warn("Drone not armed → trying to arm")
 
@@ -79,7 +78,6 @@ class MAVLinkNode(Node):
                 0, 1, 0, 0, 0, 0, 0, 0
             )
 
-            # Wait for arm confirmation
             for _ in range(20):
                 self.check_vehicle_state()
                 if self.armed:
@@ -87,23 +85,39 @@ class MAVLinkNode(Node):
                     break
                 time.sleep(0.2)
 
-        # ----- FORCE GUIDED MODE -----
         self.master.mav.set_mode_send(
             self.master.target_system,
             mavutil.mavlink.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED,
-            4   # GUIDED
+            4
         )
 
         time.sleep(0.5)
 
-        # Final check
         self.check_vehicle_state()
 
         if not self.armed:
-            self.get_logger().warn("Drone STILL not armed - ignoring command")
+            self.get_logger().warn("Drone STILL not armed")
             return False
 
         return True
+
+    # -------------------------------------------------------
+
+    def takeoff(self, altitude=3.0):
+
+        self.get_logger().info(f"Initiating TAKEOFF to {altitude}m")
+
+        self.master.mav.command_long_send(
+            self.master.target_system,
+            self.master.target_component,
+            mavutil.mavlink.MAV_CMD_NAV_TAKEOFF,
+            0,
+            0, 0, 0, 0,
+            0, 0, altitude
+        )
+
+        self.get_logger().info("Waiting for takeoff...")
+        time.sleep(5)
 
     # -------------------------------------------------------
 
@@ -115,9 +129,7 @@ class MAVLinkNode(Node):
         self.master.mav.command_long_send(
             self.master.target_system,
             self.master.target_component,
-
             mavutil.mavlink.MAV_CMD_CONDITION_YAW,
-
             0,
             target_angle,
             speed,
@@ -136,7 +148,6 @@ class MAVLinkNode(Node):
             self.master.target_component,
             mavutil.mavlink.MAV_FRAME_BODY_NED,
             0b0000111111000111,
-
             0, 0, 0,
             vx, 0, vz,
             0, 0, 0,
@@ -147,27 +158,33 @@ class MAVLinkNode(Node):
 
     def cmd_callback(self, msg: Twist):
 
-        # ENSURE READY
+        # Ensure ready
         if not self.set_guided_and_arm():
+            return
+
+        # 🔥 TAKEOFF FIRST
+        if not self.airborne:
+            self.takeoff(3.0)
+            self.airborne = True
             return
 
         yaw = msg.angular.z
         forward = msg.linear.x
         climb = msg.linear.z
 
-        # ----- STOP -----
+        # STOP
         if abs(yaw) < 0.05 and abs(forward) < 0.05 and abs(climb) < 0.05:
             self.get_logger().info("STOP command received")
             self.send_yaw(0.0)
             self.send_velocity(0.0, 0.0)
             return
 
-        # ----- YAW -----
+        # YAW
         if abs(yaw) > 0.05:
             self.send_yaw(yaw)
             self.get_logger().info(f"Yaw command sent: {yaw}")
 
-        # ----- FORWARD / ALTITUDE -----
+        # VELOCITY
         if abs(forward) > 0.05 or abs(climb) > 0.05:
             self.send_velocity(forward, climb)
             self.get_logger().info(
@@ -190,4 +207,3 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
-
